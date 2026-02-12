@@ -4,10 +4,10 @@
 
 You find issues. You think of features. You notice things that need fixing during code reviews or just using your app. But your AI agent doesn't know about any of it until you type it all out in a prompt.
 
-Handoff fixes that. Drop tasks, paste screenshots, tag and prioritize. Your AI reads the backlog as structured JSON and works through it. That's the whole loop.
+Handoff fixes that. Drop tasks, paste screenshots, tag and prioritize. Your AI reads the backlog, works through it, and marks tasks for your review. You verify the work, then close.
 
 ```
-You → Handoff → AI agent → Done
+You → Handoff → AI agent → Review → Done
 ```
 
 ---
@@ -23,7 +23,7 @@ Every developer using AI-assisted tools (Claude Code, Cursor, Copilot, Windsurf,
 
 Handoff is purpose-built for this workflow. It's local, instant, and stores everything as plain JSON that any AI agent can parse.
 
-**Zero dependencies. Single HTML file. ~200 lines of server code. Just [Bun](https://bun.sh).**
+**Zero dependencies. Single HTML file. ~250 lines of server code. Just [Bun](https://bun.sh).**
 
 ---
 
@@ -78,10 +78,24 @@ Click **Batch** to switch to multi-line input. Add dozens of tasks at once, one 
 
 ### Filter and prioritize
 
-- **Status tabs:** Open, Done, All
+- **Status tabs:** Open, Review, Done, All (with counts)
 - **Category filter:** Auto-populated from your tasks
 - **Priority filter:** High, Medium, Low
-- Open tasks auto-sort by priority (high first)
+- Open and Review tasks auto-sort by priority (high first)
+
+### Review workflow
+
+Tasks follow a three-step lifecycle: **Open → Review → Done**.
+
+- **Open** — Work to be done. Your AI reads these.
+- **Review** — AI marks tasks here when finished, with a comment explaining what was done. You verify the work.
+- **Done** — You approved the review. Archived.
+
+In the Review tab:
+- Tasks show a yellow left border and "Review" badge
+- The AI's comment appears below the task text
+- Click the checkbox to approve (moves to Done)
+- Click "Reopen" to send back to Open
 
 ### Inline editing
 
@@ -89,7 +103,7 @@ Everything is editable in place:
 - **Click task text** to edit inline
 - **Click a category badge** to rename
 - **Click the priority dot** to cycle through levels
-- **Click the checkbox** to mark done/reopen
+- **Click the checkbox** to toggle status
 
 ### Keyboard shortcuts
 
@@ -104,7 +118,16 @@ Everything is editable in place:
 
 ## AI Integration
 
-This is the reason Handoff exists. Your tasks are stored as a JSON array in `data/tasks.json`. Any AI agent that can read files can read your backlog.
+This is the reason Handoff exists. Your tasks are stored as JSON files split by status. Your AI only needs to read the open tasks.
+
+### File structure
+
+```
+data/open.json       — Tasks the AI should work on
+data/review.json     — Tasks awaiting your review
+data/done.json       — Archived completed tasks
+data/screenshots/    — PNG files named by task ID
+```
 
 ### The data format
 
@@ -115,13 +138,12 @@ This is the reason Handoff exists. Your tasks are stored as a JSON array in `dat
   "category": "auth",
   "priority": "high",
   "status": "open",
+  "comment": null,
   "screenshots": ["m1abc2def-0.png"],
   "created": "2026-02-12T06:27:59.719Z",
   "completed": null
 }
 ```
-
-Screenshots are in `data/screenshots/` and named `{taskId}-{index}.png`.
 
 ### Claude Code
 
@@ -130,35 +152,52 @@ Add this to your project's `CLAUDE.md`:
 ```markdown
 ## Task Backlog
 
-Read `path/to/handoff/data/tasks.json` for the current task backlog.
-Filter for `status: "open"` tasks, prioritize by `priority` field (high > medium > low).
+Read `path/to/handoff/data/open.json` for the current task backlog.
+Prioritize by `priority` field (high > medium > low).
 Screenshots are in `path/to/handoff/data/screenshots/` — read them for visual context.
+
+When you finish a task, mark it for review (do NOT mark as done):
+curl -X PATCH http://localhost:3456/api/tasks/TASK_ID \
+  -H "Content-Type: application/json" \
+  -d '{"status": "review", "comment": "Brief description of what you did"}'
 ```
 
 Then tell Claude: *"Check the Handoff backlog and work through the open tasks."*
 
+The key behavior: **the AI marks tasks as "review", not "done"**. This gives you a chance to verify the work before closing it out.
+
 ### Cursor / Windsurf / Copilot
 
-Same approach — add a `.cursorrules` or equivalent instruction file pointing to the JSON:
+Same approach — add a `.cursorrules` or equivalent instruction file:
 
 ```
-When asked to check the backlog, read path/to/handoff/data/tasks.json.
+When asked to check the backlog, read path/to/handoff/data/open.json.
 Work through open tasks sorted by priority. View screenshots for visual context.
+
+When finished with a task, do NOT mark it as done. Instead, mark it for review:
+curl -X PATCH http://localhost:3456/api/tasks/TASK_ID \
+  -H "Content-Type: application/json" \
+  -d '{"status": "review", "comment": "Brief description of what you did"}'
 ```
 
 ### Programmatic access
 
-Handoff also exposes a REST API on the same port:
+Handoff exposes a REST API on the same port:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/tasks` | Get all tasks |
+| `GET` | `/api/tasks` | Get all tasks (supports `?status=open\|review\|done`) |
 | `POST` | `/api/tasks` | Create a task |
 | `POST` | `/api/tasks/batch` | Create multiple tasks |
-| `PATCH` | `/api/tasks/:id` | Update a task |
+| `PATCH` | `/api/tasks/:id` | Update a task (text, category, priority, status, comment) |
 | `DELETE` | `/api/tasks/:id` | Delete a task |
 | `POST` | `/api/tasks/:id/screenshots` | Add a screenshot |
 | `GET` | `/screenshots/:filename` | Serve a screenshot |
+
+**Get only open tasks:**
+```bash
+curl http://localhost:3456/api/tasks?status=open
+```
 
 **Create a task:**
 ```bash
@@ -167,7 +206,14 @@ curl -X POST http://localhost:3456/api/tasks \
   -d '{"text": "Fix the navbar #ui !1"}'
 ```
 
-**Mark a task done:**
+**Mark a task for review:**
+```bash
+curl -X PATCH http://localhost:3456/api/tasks/TASK_ID \
+  -H "Content-Type: application/json" \
+  -d '{"status": "review", "comment": "Fixed the navbar alignment and added responsive breakpoints"}'
+```
+
+**Approve a review (mark done):**
 ```bash
 curl -X PATCH http://localhost:3456/api/tasks/TASK_ID \
   -H "Content-Type: application/json" \
@@ -194,12 +240,16 @@ Data is stored in `data/` relative to where Handoff runs. The directory is auto-
 
 Handoff is intentionally minimal:
 
-- **`server.ts`** — ~200 lines. Bun HTTP server, REST API, file serving. No frameworks, no middleware, no dependencies.
+- **`server.ts`** — ~250 lines. Bun HTTP server, REST API, file serving. No frameworks, no middleware, no dependencies.
 - **`index.html`** — Self-contained SPA. Inline CSS + vanilla JavaScript. No build step, no bundler, no npm packages.
-- **`data/tasks.json`** — Plain JSON array. Human-readable, AI-parseable, version-controllable if you want.
+- **`data/open.json`** — Open tasks (what your AI reads).
+- **`data/review.json`** — Tasks awaiting your review.
+- **`data/done.json`** — Archived completed tasks.
 - **`data/screenshots/`** — PNG files named by task ID.
 
-The entire tool is 4 files and runs on nothing but Bun.
+The entire tool is a few files and runs on nothing but Bun.
+
+> **Migration:** If you have a legacy `data/tasks.json` from a previous version, Handoff automatically splits it into the three status files on startup and removes the old file.
 
 ---
 
@@ -211,6 +261,7 @@ Handoff was born from building software with AI agents every day. We needed a wa
 - **Local-first.** Your tasks live on your machine. No accounts, no cloud, no sync.
 - **Zero friction.** If adding a task takes more than 2 seconds, the tool has failed.
 - **AI-native.** JSON storage isn't a technical choice — it's a design choice. Your AI agent is a first-class consumer of this data.
+- **Review before done.** AI work needs human verification. The review step prevents silent mistakes.
 - **No dependencies.** Nothing to install, nothing to update, nothing to break. Just Bun and your browser.
 
 ---

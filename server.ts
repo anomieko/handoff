@@ -5,25 +5,90 @@ const PORT = parseInt(process.env.PORT || "3456");
 const ROOT = import.meta.dir;
 const DATA_DIR = join(ROOT, "data");
 const SCREENSHOTS_DIR = join(DATA_DIR, "screenshots");
-const TASKS_FILE = join(DATA_DIR, "tasks.json");
+
+// Split storage — one file per status
+const OPEN_FILE = join(DATA_DIR, "open.json");
+const REVIEW_FILE = join(DATA_DIR, "review.json");
+const DONE_FILE = join(DATA_DIR, "done.json");
+const LEGACY_FILE = join(DATA_DIR, "tasks.json");
 
 // Bootstrap data directories
 mkdirSync(SCREENSHOTS_DIR, { recursive: true });
-if (!existsSync(TASKS_FILE)) writeFileSync(TASKS_FILE, "[]");
 
 interface Task {
   id: string;
   text: string;
   category: string;
   priority: "high" | "medium" | "low";
-  status: "open" | "done";
+  status: "open" | "review" | "done";
+  comment: string | null;
   screenshots: string[];
   created: string;
   completed: string | null;
 }
 
-const load = (): Task[] => JSON.parse(readFileSync(TASKS_FILE, "utf-8"));
-const save = (tasks: Task[]) => writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+// --- Storage helpers ---
+const loadFile = (path: string): Task[] => {
+  if (!existsSync(path)) return [];
+  try { return JSON.parse(readFileSync(path, "utf-8")); }
+  catch { return []; }
+};
+
+const saveFile = (path: string, tasks: Task[]) =>
+  writeFileSync(path, JSON.stringify(tasks, null, 2));
+
+const fileForStatus = (status: string): string => {
+  if (status === "review") return REVIEW_FILE;
+  if (status === "done") return DONE_FILE;
+  return OPEN_FILE;
+};
+
+const loadAll = (): Task[] => [
+  ...loadFile(OPEN_FILE),
+  ...loadFile(REVIEW_FILE),
+  ...loadFile(DONE_FILE),
+];
+
+const findTask = (id: string): { task: Task; file: string; tasks: Task[] } | null => {
+  for (const file of [OPEN_FILE, REVIEW_FILE, DONE_FILE]) {
+    const tasks = loadFile(file);
+    const task = tasks.find(t => t.id === id);
+    if (task) return { task, file, tasks };
+  }
+  return null;
+};
+
+// --- Migration from legacy tasks.json ---
+if (existsSync(LEGACY_FILE)) {
+  console.log("Migrating legacy tasks.json to split files...");
+  try {
+    const legacy: any[] = JSON.parse(readFileSync(LEGACY_FILE, "utf-8"));
+    const open: Task[] = [];
+    const review: Task[] = [];
+    const done: Task[] = [];
+
+    for (const t of legacy) {
+      const task: Task = { ...t, comment: t.comment ?? null };
+      if (task.status === "done") done.push(task);
+      else if (task.status === "review") review.push(task);
+      else open.push(task);
+    }
+
+    saveFile(OPEN_FILE, open);
+    saveFile(REVIEW_FILE, review);
+    saveFile(DONE_FILE, done);
+    unlinkSync(LEGACY_FILE);
+    console.log(`  Migrated: ${open.length} open, ${review.length} review, ${done.length} done`);
+  } catch (e) {
+    console.error("Migration failed, keeping legacy file:", e);
+  }
+}
+
+// Ensure split files exist
+for (const f of [OPEN_FILE, REVIEW_FILE, DONE_FILE]) {
+  if (!existsSync(f)) writeFileSync(f, "[]");
+}
+
 const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 
@@ -58,19 +123,23 @@ function saveScreenshot(taskId: string, idx: number, data: string): string {
 Bun.serve({
   port: PORT,
   async fetch(req) {
-    const { pathname } = new URL(req.url);
+    const url = new URL(req.url);
+    const pathname = url.pathname;
     const method = req.method;
 
     try {
-      // GET /api/tasks
+      // GET /api/tasks — supports ?status=open|review|done
       if (pathname === "/api/tasks" && method === "GET") {
-        return json(load());
+        const statusParam = url.searchParams.get("status");
+        if (statusParam && ["open", "review", "done"].includes(statusParam)) {
+          return json(loadFile(fileForStatus(statusParam)));
+        }
+        return json(loadAll());
       }
 
       // POST /api/tasks
       if (pathname === "/api/tasks" && method === "POST") {
         const body = await req.json();
-        const tasks = load();
         const parsed = parseTags(body.text || "");
         const taskId = genId();
 
@@ -87,20 +156,21 @@ Bun.serve({
           category: body.category || parsed.category,
           priority: body.priority || parsed.priority,
           status: "open",
+          comment: null,
           screenshots,
           created: new Date().toISOString(),
           completed: null,
         };
 
+        const tasks = loadFile(OPEN_FILE);
         tasks.unshift(task);
-        save(tasks);
+        saveFile(OPEN_FILE, tasks);
         return json(task, 201);
       }
 
       // POST /api/tasks/batch
       if (pathname === "/api/tasks/batch" && method === "POST") {
         const body = await req.json();
-        const tasks = load();
         const created: Task[] = [];
 
         for (const line of body.lines || []) {
@@ -113,27 +183,29 @@ Bun.serve({
             category: parsed.category,
             priority: parsed.priority,
             status: "open",
+            comment: null,
             screenshots: [],
             created: new Date().toISOString(),
             completed: null,
           });
         }
 
+        const tasks = loadFile(OPEN_FILE);
         tasks.unshift(...created);
-        save(tasks);
+        saveFile(OPEN_FILE, tasks);
         return json(created, 201);
       }
 
       // /api/tasks/:id/screenshots
       const ssMatch = pathname.match(/^\/api\/tasks\/([a-z0-9]+)\/screenshots$/);
       if (ssMatch && method === "POST") {
-        const tasks = load();
-        const task = tasks.find((t) => t.id === ssMatch[1]);
-        if (!task) return json({ error: "Not found" }, 404);
+        const found = findTask(ssMatch[1]);
+        if (!found) return json({ error: "Not found" }, 404);
+        const { task, file, tasks } = found;
         const body = await req.json();
         const filename = saveScreenshot(task.id, task.screenshots.length, body.data);
         task.screenshots.push(filename);
-        save(tasks);
+        saveFile(file, tasks);
         return json(task);
       }
 
@@ -141,30 +213,56 @@ Bun.serve({
       const taskMatch = pathname.match(/^\/api\/tasks\/([a-z0-9]+)$/);
       if (taskMatch) {
         const taskId = taskMatch[1];
-        const tasks = load();
-        const idx = tasks.findIndex((t) => t.id === taskId);
-        if (idx === -1) return json({ error: "Not found" }, 404);
 
         if (method === "PATCH") {
+          const found = findTask(taskId);
+          if (!found) return json({ error: "Not found" }, 404);
+          const { task, file: sourceFile, tasks: sourceTasks } = found;
           const body = await req.json();
-          const task = tasks[idx];
+
           if (body.text !== undefined) task.text = body.text;
           if (body.category !== undefined) task.category = body.category;
           if (body.priority !== undefined) task.priority = body.priority;
-          if (body.status !== undefined) {
-            task.status = body.status;
-            task.completed = body.status === "done" ? new Date().toISOString() : null;
+          if (body.comment !== undefined) task.comment = body.comment;
+
+          if (body.status !== undefined && body.status !== task.status) {
+            const newStatus = body.status as Task["status"];
+            task.status = newStatus;
+            task.completed = newStatus === "done" ? new Date().toISOString() : null;
+
+            // Move task between files
+            const destFile = fileForStatus(newStatus);
+            if (destFile !== sourceFile) {
+              // Remove from source
+              const idx = sourceTasks.findIndex(t => t.id === taskId);
+              if (idx !== -1) sourceTasks.splice(idx, 1);
+              saveFile(sourceFile, sourceTasks);
+
+              // Add to destination
+              const destTasks = loadFile(destFile);
+              destTasks.unshift(task);
+              saveFile(destFile, destTasks);
+
+              return json(task);
+            }
           }
-          save(tasks);
+
+          saveFile(sourceFile, sourceTasks);
           return json(task);
         }
 
         if (method === "DELETE") {
-          for (const s of tasks[idx].screenshots) {
+          const found = findTask(taskId);
+          if (!found) return json({ error: "Not found" }, 404);
+          const { task, file, tasks } = found;
+
+          for (const s of task.screenshots) {
             try { unlinkSync(join(SCREENSHOTS_DIR, s)); } catch {}
           }
-          tasks.splice(idx, 1);
-          save(tasks);
+
+          const idx = tasks.findIndex(t => t.id === taskId);
+          if (idx !== -1) tasks.splice(idx, 1);
+          saveFile(file, tasks);
           return new Response(null, { status: 204 });
         }
       }

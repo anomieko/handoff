@@ -280,6 +280,14 @@
     .tab:hover { color: var(--text-2); }
     .tab.active { background: var(--surface-2); color: var(--text); }
 
+    .tab-count {
+      font-size: 11px;
+      color: var(--text-3);
+      margin-left: 4px;
+    }
+
+    .tab.active .tab-count { color: var(--text-2); }
+
     .filter-selects {
       display: flex;
       gap: 6px;
@@ -316,6 +324,10 @@
     .task.done { opacity: 0.55; }
     .task.done:hover { opacity: 0.75; }
 
+    .task.review {
+      border-left: 3px solid var(--warning);
+    }
+
     .task-row {
       display: flex;
       align-items: center;
@@ -349,6 +361,22 @@
       left: 50%;
       transform: translate(-50%, -50%);
       color: white;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .task.review .check {
+      border-radius: 50%;
+      border-color: var(--warning);
+    }
+
+    .task.review .check::after {
+      content: '\2192';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--warning);
       font-size: 11px;
       font-weight: bold;
     }
@@ -397,6 +425,15 @@
 
     .badge:hover { opacity: 0.8; }
 
+    .review-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+      white-space: nowrap;
+    }
+
     .pri-dot {
       width: 8px;
       height: 8px;
@@ -443,6 +480,31 @@
 
     .task:hover .del-btn { opacity: 0.6; }
     .del-btn:hover { opacity: 1 !important; color: var(--danger); }
+
+    .reopen-btn {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      transition: color 0.15s;
+    }
+
+    .reopen-btn:hover { color: var(--accent-hover); }
+
+    /* Task Comment */
+    .task-comment {
+      padding: 0 14px 10px 44px;
+      font-size: 13px;
+      color: var(--text-3);
+      line-height: 1.4;
+    }
+
+    .task-comment::before {
+      content: '\2192 ';
+      opacity: 0.5;
+    }
 
     /* Screenshot Gallery */
     .ss-gallery {
@@ -586,6 +648,7 @@
     <div class="filters">
       <div class="filter-tabs">
         <button class="tab active" data-status="open">Open</button>
+        <button class="tab" data-status="review">Review</button>
         <button class="tab" data-status="done">Done</button>
         <button class="tab" data-status="all">All</button>
       </div>
@@ -683,7 +746,8 @@
     async function toggleDone(id) {
       const task = tasks.find(t => t.id === id);
       if (!task) return;
-      const newStatus = task.status === 'open' ? 'done' : 'open';
+      // open → done, review → done (approve), done → open (reopen)
+      const newStatus = task.status === 'done' ? 'open' : 'done';
       const updated = await api(`/tasks/${id}`, { method: 'PATCH', body: { status: newStatus } });
       Object.assign(task, updated);
       render();
@@ -737,6 +801,7 @@
       renderTasks();
       renderStats();
       renderCategoryOptions();
+      renderTabCounts();
     }
 
     function renderTasks() {
@@ -747,8 +812,8 @@
         return true;
       });
 
-      // Sort open tasks: high > medium > low
-      if (filter.status === 'open') {
+      // Sort open and review tasks: high > medium > low
+      if (filter.status === 'open' || filter.status === 'review') {
         const order = { high: 0, medium: 1, low: 2 };
         filtered.sort((a, b) => order[a.priority] - order[b.priority]);
       }
@@ -756,16 +821,22 @@
       if (!filtered.length) {
         taskListEl.innerHTML = '';
         const msg = filter.status === 'done' ? 'No completed tasks yet' :
+                    filter.status === 'review' ? 'No tasks awaiting review' :
                     filter.status === 'open' ? 'No open tasks' : 'No tasks yet';
         taskListEl.innerHTML = `<div class="empty">${msg}</div>`;
         return;
       }
 
       taskListEl.innerHTML = '<div class="task-list-inner">' + filtered.map(t => {
-        const done = t.status === 'done';
         const expanded = expandedId === t.id;
         const catBadge = t.category
           ? `<span class="badge" style="--hue:${catHue(t.category)}" data-action="edit-cat" data-id="${t.id}" title="Click to change">${esc(t.category)}</span>`
+          : '';
+        const reviewBadge = t.status === 'review'
+          ? `<span class="review-badge">Review</span>`
+          : '';
+        const reopenLink = t.status === 'review'
+          ? `<button class="reopen-btn" data-action="reopen" data-id="${t.id}">Reopen</button>`
           : '';
         const priDot = `<span class="pri-dot pri-${t.priority}" data-action="cycle-pri" data-id="${t.id}" title="${t.priority} — click to cycle"></span>`;
         const ssCount = t.screenshots.length
@@ -776,18 +847,22 @@
               `<img src="/screenshots/${s}" class="ss-thumb" data-action="view-ss" data-src="/screenshots/${s}">`
             ).join('')}</div>`
           : '';
+        const commentBlock = t.comment
+          ? `<div class="task-comment">${esc(t.comment)}</div>`
+          : '';
 
         return `
-          <div class="task ${done ? 'done' : ''} ${expanded ? 'expanded' : ''}" data-id="${t.id}">
+          <div class="task ${t.status}" data-id="${t.id}">
             <div class="task-row">
               <button class="check" data-action="toggle" data-id="${t.id}"></button>
               <span class="task-text" data-action="edit-text" data-id="${t.id}">${esc(t.text)}</span>
               <div class="task-meta">
-                ${ssCount}${catBadge}${priDot}
+                ${ssCount}${reviewBadge}${catBadge}${priDot}${reopenLink}
                 <span class="age">${timeAgo(t.created)}</span>
                 <button class="del-btn" data-action="delete" data-id="${t.id}" title="Delete">&times;</button>
               </div>
             </div>
+            ${commentBlock}
             ${gallery}
           </div>`;
       }).join('') + '</div>';
@@ -803,8 +878,24 @@
 
     function renderStats() {
       const open = tasks.filter(t => t.status === 'open').length;
+      const review = tasks.filter(t => t.status === 'review').length;
       const done = tasks.filter(t => t.status === 'done').length;
-      statsEl.textContent = `${open} open \u00b7 ${done} done \u00b7 ${tasks.length} total`;
+      statsEl.textContent = `${open} open \u00b7 ${review} review \u00b7 ${done} done \u00b7 ${tasks.length} total`;
+    }
+
+    function renderTabCounts() {
+      const counts = { open: 0, review: 0, done: 0, all: 0 };
+      for (const t of tasks) {
+        if (counts[t.status] !== undefined) counts[t.status]++;
+        counts.all++;
+      }
+      document.querySelectorAll('.tab').forEach(tab => {
+        const status = tab.dataset.status;
+        const count = counts[status] || 0;
+        const label = status.charAt(0).toUpperCase() + status.slice(1);
+        const countSpan = count > 0 ? ` <span class="tab-count">(${count})</span>` : '';
+        tab.innerHTML = label + countSpan;
+      });
     }
 
     function renderCategoryOptions() {
@@ -1041,6 +1132,10 @@
       switch (action) {
         case 'toggle':
           toggleDone(id);
+          break;
+
+        case 'reopen':
+          updateField(id, 'status', 'open');
           break;
 
         case 'delete':
