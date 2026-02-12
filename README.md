@@ -2,7 +2,7 @@
 
 **The missing bridge between you and your AI coding agent.**
 
-You find issues. You think of features. You notice things that need fixing during play sessions, code reviews, or just using your app. But your AI agent doesn't know about any of it until you type it all out in a prompt.
+You find issues. You think of features. You notice things that need fixing during code reviews or just using your app. But your AI agent doesn't know about any of it until you type it all out in a prompt.
 
 Handoff fixes that. Drop tasks, paste screenshots, tag and prioritize. Your AI reads the backlog as structured JSON and works through it. That's the whole loop.
 
