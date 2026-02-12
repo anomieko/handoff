@@ -1,0 +1,16 @@
+# Task data (user-specific, not part of the tool)
+data/
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

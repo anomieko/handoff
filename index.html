@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Handoff</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #09090b;
+      --surface: #18181b;
+      --surface-2: #27272a;
+      --border: #3f3f46;
+      --text: #fafafa;
+      --text-2: #a1a1aa;
+      --text-3: #71717a;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-bg: rgba(99, 102, 241, 0.12);
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #eab308;
+      --radius: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    #app {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .header-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-2);
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    .header-btn:hover { background: var(--surface-2); color: var(--text); }
+    .header-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    /* Quick Add */
+    .quick-add {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .quick-add-row {
+      display: flex;
+      gap: 8px;
+      position: relative;
+    }
+
+    .quick-add-row input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .quick-add-row input:focus { border-color: var(--accent); }
+    .quick-add-row input::placeholder { color: var(--text-3); }
+
+    .btn-primary {
+      background: var(--accent);
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: default; }
+
+    /* Screenshot Preview */
+    .ss-preview {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ss-pending {
+      position: relative;
+      width: 80px;
+      height: 60px;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .ss-pending img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .ss-remove {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      border: none;
+      color: white;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .ss-remove:hover { background: var(--danger); }
+
+    /* Options Row */
+    .options-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .options-row select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: var(--text-2);
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .options-row select:focus { border-color: var(--accent); }
+
+    .quick-add-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .link-btn {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 0;
+    }
+
+    .link-btn:hover { color: var(--text-2); }
+
+    .hint {
+      font-size: 11px;
+      color: var(--text-3);
+    }
+
+    .hint kbd {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+
+    /* Batch Panel */
+    .batch-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .batch-panel textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      min-height: 100px;
+      transition: border-color 0.15s;
+    }
+
+    .batch-panel textarea:focus { border-color: var(--accent); }
+    .batch-panel textarea::placeholder { color: var(--text-3); }
+
+    .batch-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .batch-footer span { font-size: 13px; color: var(--text-3); }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .tab {
+      background: none;
+      border: none;
+      color: var(--text-3);
+      padding: 6px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    .tab:hover { color: var(--text-2); }
+    .tab.active { background: var(--surface-2); color: var(--text); }
+
+    .filter-selects {
+      display: flex;
+      gap: 6px;
+    }
+
+    .filter-selects select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      color: var(--text-2);
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Task List */
+    .task-list {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .task-list:empty { border: none; }
+
+    .task {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+
+    .task:last-child { border-bottom: none; }
+    .task:hover { background: var(--surface); }
+    .task.done { opacity: 0.55; }
+    .task.done:hover { opacity: 0.75; }
+
+    .task-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+    }
+
+    .check {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      transition: all 0.15s;
+    }
+
+    .check:hover { border-color: var(--accent); }
+
+    .task.done .check {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .task.done .check::after {
+      content: '\2713';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .task-text {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+      transition: color 0.1s;
+      word-break: break-word;
+    }
+
+    .task-text:hover { color: var(--accent-hover); }
+    .task.done .task-text { text-decoration: line-through; color: var(--text-3); }
+    .task.done .task-text:hover { color: var(--text-2); }
+
+    .edit-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 4px 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .task-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: hsl(var(--hue) 45% 18%);
+      color: hsl(var(--hue) 65% 72%);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+
+    .badge:hover { opacity: 0.8; }
+
+    .pri-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .pri-dot:hover { transform: scale(1.4); }
+    .pri-high { background: var(--danger); }
+    .pri-medium { background: var(--warning); }
+    .pri-low { background: var(--text-3); }
+
+    .ss-indicator {
+      font-size: 12px;
+      color: var(--text-3);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+
+    .ss-indicator:hover { color: var(--text); }
+
+    .age {
+      font-size: 11px;
+      color: var(--text-3);
+      min-width: 22px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .del-btn {
+      opacity: 0;
+      background: none;
+      border: none;
+      color: var(--text-3);
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0 2px;
+      line-height: 1;
+      transition: all 0.15s;
+    }
+
+    .task:hover .del-btn { opacity: 0.6; }
+    .del-btn:hover { opacity: 1 !important; color: var(--danger); }
+
+    /* Screenshot Gallery */
+    .ss-gallery {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 0 14px 12px 44px;
+    }
+
+    .ss-thumb {
+      width: 160px;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .ss-thumb:hover {
+      border-color: var(--accent);
+      transform: scale(1.02);
+    }
+
+    /* Stats */
+    .stats {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-3);
+      padding: 8px 0;
+    }
+
+    /* Empty State */
+    .empty {
+      padding: 48px 20px;
+      text-align: center;
+      color: var(--text-3);
+      font-size: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+
+    /* Autocomplete Dropdown */
+    .autocomplete-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      margin-top: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .ac-option {
+      padding: 8px 14px;
+      font-size: 13px;
+      color: var(--text-2);
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+    }
+
+    .ac-option:first-child { border-radius: 6px 6px 0 0; }
+    .ac-option:last-child { border-radius: 0 0 6px 6px; }
+    .ac-option:only-child { border-radius: 6px; }
+    .ac-option:hover { background: var(--surface-2); color: var(--text); }
+    .ac-option.ac-active { background: var(--accent-bg); color: var(--accent); }
+
+    .hidden { display: none !important; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .task { animation: slideIn 0.15s ease-out; }
+
+    /* Lightbox */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      cursor: pointer;
+    }
+
+    .lightbox img {
+      max-width: 90vw;
+      max-height: 90vh;
+      border-radius: 8px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Handoff</h1>
+      <button id="batch-btn" class="header-btn">Batch</button>
+    </header>
+
+    <div class="quick-add" id="quick-add">
+      <div class="quick-add-row">
+        <input type="text" id="input" placeholder="Add a task...  #tag for category, !1 !2 !3 for priority" autofocus>
+        <button id="add-btn" class="btn-primary">Add</button>
+        <div id="autocomplete" class="autocomplete-dropdown hidden"></div>
+      </div>
+      <div id="ss-preview" class="ss-preview hidden"></div>
+      <div id="options-row" class="options-row hidden">
+        <select id="opt-cat"><option value="">Category</option></select>
+        <select id="opt-pri">
+          <option value="">Priority</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="quick-add-footer">
+        <button id="options-btn" class="link-btn">Options</button>
+        <span class="hint">Press <kbd>/</kbd> to focus &middot; Paste images to attach</span>
+      </div>
+    </div>
+
+    <div id="batch-panel" class="batch-panel hidden">
+      <textarea id="batch-input" rows="6" placeholder="One task per line...&#10;#tag and !1/!2/!3 work inline"></textarea>
+      <div class="batch-footer">
+        <span id="batch-count">0 tasks</span>
+        <button id="batch-submit" class="btn-primary">Add All</button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-tabs">
+        <button class="tab active" data-status="open">Open</button>
+        <button class="tab" data-status="done">Done</button>
+        <button class="tab" data-status="all">All</button>
+      </div>
+      <div class="filter-selects">
+        <select id="filter-cat"><option value="">All categories</option></select>
+        <select id="filter-pri">
+          <option value="">All priorities</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="task-list"></div>
+    <div id="stats" class="stats"></div>
+  </div>
+
+  <script>
+    // --- State ---
+    let tasks = [];
+    let pendingScreenshots = [];
+    let filter = { status: 'open', category: '', priority: '' };
+    let expandedId = null;
+
+    // --- DOM ---
+    const $ = (id) => document.getElementById(id);
+    const input = $('input');
+    const addBtn = $('add-btn');
+    const ssPreview = $('ss-preview');
+    const optionsRow = $('options-row');
+    const optionsBtn = $('options-btn');
+    const optCat = $('opt-cat');
+    const optPri = $('opt-pri');
+    const batchPanel = $('batch-panel');
+    const batchInput = $('batch-input');
+    const batchCount = $('batch-count');
+    const batchSubmit = $('batch-submit');
+    const batchBtn = $('batch-btn');
+    const filterCat = $('filter-cat');
+    const filterPri = $('filter-pri');
+    const taskListEl = $('task-list');
+    const statsEl = $('stats');
+
+    // --- API ---
+    async function api(path, opts = {}) {
+      const res = await fetch('/api' + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      if (res.status === 204) return null;
+      return res.json();
+    }
+
+    // --- Task Operations ---
+    async function loadTasks() {
+      tasks = await api('/tasks');
+      render();
+    }
+
+    async function addTask() {
+      const text = input.value.trim();
+      if (!text && !pendingScreenshots.length) return;
+
+      const body = { text };
+      if (optCat.value) body.category = optCat.value;
+      if (optPri.value) body.priority = optPri.value;
+      if (pendingScreenshots.length) body.screenshots = pendingScreenshots;
+
+      const task = await api('/tasks', { method: 'POST', body });
+      tasks.unshift(task);
+
+      input.value = '';
+      pendingScreenshots = [];
+      ssPreview.innerHTML = '';
+      ssPreview.classList.add('hidden');
+      optCat.value = '';
+      optPri.value = '';
+      input.focus();
+      render();
+    }
+
+    async function addBatch() {
+      const lines = batchInput.value.split('\n').filter(l => l.trim());
+      if (!lines.length) return;
+
+      const created = await api('/tasks/batch', { method: 'POST', body: { lines } });
+      tasks.unshift(...created);
+      batchInput.value = '';
+      updateBatchCount();
+      render();
+    }
+
+    async function toggleDone(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const newStatus = task.status === 'open' ? 'done' : 'open';
+      const updated = await api(`/tasks/${id}`, { method: 'PATCH', body: { status: newStatus } });
+      Object.assign(task, updated);
+      render();
+    }
+
+    async function updateField(id, field, value) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const updated = await api(`/tasks/${id}`, { method: 'PATCH', body: { [field]: value } });
+      Object.assign(task, updated);
+      render();
+    }
+
+    async function deleteTask(id) {
+      await api(`/tasks/${id}`, { method: 'DELETE' });
+      tasks = tasks.filter(t => t.id !== id);
+      if (expandedId === id) expandedId = null;
+      render();
+    }
+
+    async function addScreenshotToTask(id, dataUrl) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+      const updated = await api(`/tasks/${id}/screenshots`, { method: 'POST', body: { data: dataUrl } });
+      Object.assign(task, updated);
+      render();
+    }
+
+    // --- Rendering ---
+    function catHue(cat) {
+      let h = 0;
+      for (let i = 0; i < cat.length; i++) h = cat.charCodeAt(i) + ((h << 5) - h);
+      return Math.abs(h) % 360;
+    }
+
+    function timeAgo(iso) {
+      const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (s < 60) return 'now';
+      if (s < 3600) return Math.floor(s / 60) + 'm';
+      if (s < 86400) return Math.floor(s / 3600) + 'h';
+      return Math.floor(s / 86400) + 'd';
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function render() {
+      renderTasks();
+      renderStats();
+      renderCategoryOptions();
+    }
+
+    function renderTasks() {
+      let filtered = tasks.filter(t => {
+        if (filter.status !== 'all' && t.status !== filter.status) return false;
+        if (filter.category && t.category !== filter.category) return false;
+        if (filter.priority && t.priority !== filter.priority) return false;
+        return true;
+      });
+
+      // Sort open tasks: high > medium > low
+      if (filter.status === 'open') {
+        const order = { high: 0, medium: 1, low: 2 };
+        filtered.sort((a, b) => order[a.priority] - order[b.priority]);
+      }
+
+      if (!filtered.length) {
+        taskListEl.innerHTML = '';
+        const msg = filter.status === 'done' ? 'No completed tasks yet' :
+                    filter.status === 'open' ? 'No open tasks' : 'No tasks yet';
+        taskListEl.innerHTML = `<div class="empty">${msg}</div>`;
+        return;
+      }
+
+      taskListEl.innerHTML = '<div class="task-list-inner">' + filtered.map(t => {
+        const done = t.status === 'done';
+        const expanded = expandedId === t.id;
+        const catBadge = t.category
+          ? `<span class="badge" style="--hue:${catHue(t.category)}" data-action="edit-cat" data-id="${t.id}" title="Click to change">${esc(t.category)}</span>`
+          : '';
+        const priDot = `<span class="pri-dot pri-${t.priority}" data-action="cycle-pri" data-id="${t.id}" title="${t.priority} — click to cycle"></span>`;
+        const ssCount = t.screenshots.length
+          ? `<span class="ss-indicator" data-action="toggle-expand" data-id="${t.id}">&#128247; ${t.screenshots.length}</span>`
+          : '';
+        const gallery = expanded && t.screenshots.length
+          ? `<div class="ss-gallery">${t.screenshots.map(s =>
+              `<img src="/screenshots/${s}" class="ss-thumb" data-action="view-ss" data-src="/screenshots/${s}">`
+            ).join('')}</div>`
+          : '';
+
+        return `
+          <div class="task ${done ? 'done' : ''} ${expanded ? 'expanded' : ''}" data-id="${t.id}">
+            <div class="task-row">
+              <button class="check" data-action="toggle" data-id="${t.id}"></button>
+              <span class="task-text" data-action="edit-text" data-id="${t.id}">${esc(t.text)}</span>
+              <div class="task-meta">
+                ${ssCount}${catBadge}${priDot}
+                <span class="age">${timeAgo(t.created)}</span>
+                <button class="del-btn" data-action="delete" data-id="${t.id}" title="Delete">&times;</button>
+              </div>
+            </div>
+            ${gallery}
+          </div>`;
+      }).join('') + '</div>';
+
+      // Rebind inner wrapper for styling
+      const inner = taskListEl.querySelector('.task-list-inner');
+      if (inner) {
+        inner.style.border = `1px solid var(--border)`;
+        inner.style.borderRadius = 'var(--radius)';
+        inner.style.overflow = 'hidden';
+      }
+    }
+
+    function renderStats() {
+      const open = tasks.filter(t => t.status === 'open').length;
+      const done = tasks.filter(t => t.status === 'done').length;
+      statsEl.textContent = `${open} open \u00b7 ${done} done \u00b7 ${tasks.length} total`;
+    }
+
+    function renderCategoryOptions() {
+      const cats = [...new Set(tasks.map(t => t.category).filter(Boolean))].sort();
+
+      // Filter dropdown
+      const curFilter = filterCat.value;
+      filterCat.innerHTML = '<option value="">All categories</option>' +
+        cats.map(c => `<option value="${c}" ${c === curFilter ? 'selected' : ''}>${c}</option>`).join('');
+
+      // Quick-add dropdown
+      const curOpt = optCat.value;
+      optCat.innerHTML = '<option value="">Category</option>' +
+        cats.map(c => `<option value="${c}" ${c === curOpt ? 'selected' : ''}>${c}</option>`).join('') +
+        '<option value="__new">+ New...</option>';
+    }
+
+    function renderScreenshotPreview() {
+      if (!pendingScreenshots.length) {
+        ssPreview.classList.add('hidden');
+        ssPreview.innerHTML = '';
+        return;
+      }
+      ssPreview.classList.remove('hidden');
+      ssPreview.innerHTML = pendingScreenshots.map((s, i) => `
+        <div class="ss-pending">
+          <img src="${s}">
+          <button class="ss-remove" data-idx="${i}">&times;</button>
+        </div>
+      `).join('');
+    }
+
+    // --- Autocomplete ---
+    let acOptions = [];
+    let acIndex = 0;
+    let acActive = false;
+    const acEl = $('autocomplete');
+
+    function getHashContext() {
+      const pos = input.selectionStart;
+      const val = input.value;
+      for (let i = pos - 1; i >= 0; i--) {
+        if (val[i] === '#') {
+          // Make sure # is at start or preceded by a space
+          if (i === 0 || val[i - 1] === ' ') {
+            return { start: i, fragment: val.slice(i + 1, pos).toLowerCase() };
+          }
+          return null;
+        }
+        if (val[i] === ' ') return null;
+      }
+      return null;
+    }
+
+    function updateAutocomplete() {
+      const ctx = getHashContext();
+      if (!ctx) { hideAutocomplete(); return; }
+
+      const cats = [...new Set(tasks.map(t => t.category).filter(Boolean))].sort();
+      const matches = cats.filter(c => c.toLowerCase().startsWith(ctx.fragment));
+
+      if (!matches.length) { hideAutocomplete(); return; }
+
+      acOptions = matches;
+      acIndex = 0;
+      renderAutocomplete();
+      acActive = true;
+      acEl.classList.remove('hidden');
+    }
+
+    function renderAutocomplete() {
+      acEl.innerHTML = acOptions.map((opt, i) =>
+        `<div class="ac-option${i === acIndex ? ' ac-active' : ''}" data-idx="${i}">${esc(opt)}</div>`
+      ).join('');
+    }
+
+    function acceptAutocomplete(idx) {
+      if (idx !== undefined) acIndex = idx;
+      if (!acOptions.length) return;
+
+      const ctx = getHashContext();
+      if (!ctx) { hideAutocomplete(); return; }
+
+      const chosen = acOptions[acIndex];
+      const val = input.value;
+      const before = val.slice(0, ctx.start);
+      const after = val.slice(ctx.start + 1 + ctx.fragment.length);
+      input.value = before + '#' + chosen + (after.startsWith(' ') ? '' : ' ') + after;
+      const cursorPos = before.length + 1 + chosen.length + 1;
+      input.setSelectionRange(cursorPos, cursorPos);
+      hideAutocomplete();
+    }
+
+    function hideAutocomplete() {
+      acActive = false;
+      acOptions = [];
+      acIndex = 0;
+      acEl.classList.add('hidden');
+      acEl.innerHTML = '';
+    }
+
+    acEl.addEventListener('mousedown', e => {
+      const opt = e.target.closest('.ac-option');
+      if (opt) {
+        e.preventDefault();
+        acceptAutocomplete(parseInt(opt.dataset.idx));
+      }
+    });
+
+    // --- Event Handlers ---
+
+    // Quick add
+    input.addEventListener('keydown', e => {
+      if (acActive) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          acIndex = (acIndex + 1) % acOptions.length;
+          renderAutocomplete();
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          acIndex = (acIndex - 1 + acOptions.length) % acOptions.length;
+          renderAutocomplete();
+          return;
+        }
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          acceptAutocomplete();
+          return;
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          hideAutocomplete();
+          return;
+        }
+      }
+      if (e.key === 'Enter') addTask();
+    });
+    input.addEventListener('input', updateAutocomplete);
+    input.addEventListener('blur', () => { setTimeout(hideAutocomplete, 150); });
+    addBtn.addEventListener('click', addTask);
+
+    // Paste screenshots
+    document.addEventListener('paste', e => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (expandedId) {
+              addScreenshotToTask(expandedId, reader.result);
+            } else {
+              pendingScreenshots.push(reader.result);
+              renderScreenshotPreview();
+              input.focus();
+            }
+          };
+          reader.readAsDataURL(item.getAsFile());
+          break;
+        }
+      }
+    });
+
+    // Remove pending screenshot
+    ssPreview.addEventListener('click', e => {
+      const btn = e.target.closest('.ss-remove');
+      if (btn) {
+        pendingScreenshots.splice(parseInt(btn.dataset.idx), 1);
+        renderScreenshotPreview();
+      }
+    });
+
+    // Options toggle
+    optionsBtn.addEventListener('click', () => {
+      optionsRow.classList.toggle('hidden');
+      optionsBtn.textContent = optionsRow.classList.contains('hidden') ? 'Options' : 'Hide options';
+    });
+
+    // New category via dropdown
+    optCat.addEventListener('change', () => {
+      if (optCat.value === '__new') {
+        const name = prompt('Category name:');
+        if (name && name.trim()) {
+          const val = name.trim().toLowerCase();
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          opt.selected = true;
+          optCat.insertBefore(opt, optCat.lastElementChild);
+        } else {
+          optCat.value = '';
+        }
+      }
+    });
+
+    // Batch mode
+    batchBtn.addEventListener('click', () => {
+      batchPanel.classList.toggle('hidden');
+      batchBtn.classList.toggle('active');
+      if (!batchPanel.classList.contains('hidden')) batchInput.focus();
+    });
+
+    batchInput.addEventListener('input', updateBatchCount);
+    batchSubmit.addEventListener('click', addBatch);
+
+    function updateBatchCount() {
+      const count = batchInput.value.split('\n').filter(l => l.trim()).length;
+      batchCount.textContent = `${count} task${count !== 1 ? 's' : ''}`;
+    }
+
+    // Filters
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        filter.status = tab.dataset.status;
+        render();
+      });
+    });
+
+    filterCat.addEventListener('change', () => { filter.category = filterCat.value; render(); });
+    filterPri.addEventListener('change', () => { filter.priority = filterPri.value; render(); });
+
+    // Task list click delegation
+    taskListEl.addEventListener('click', e => {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      const { action, id } = el.dataset;
+
+      switch (action) {
+        case 'toggle':
+          toggleDone(id);
+          break;
+
+        case 'delete':
+          deleteTask(id);
+          break;
+
+        case 'toggle-expand':
+          expandedId = expandedId === id ? null : id;
+          render();
+          break;
+
+        case 'view-ss':
+          openLightbox(el.dataset.src);
+          break;
+
+        case 'edit-text':
+          startEditText(id);
+          break;
+
+        case 'edit-cat': {
+          const task = tasks.find(t => t.id === id);
+          const name = prompt('Category:', task?.category || '');
+          if (name !== null) updateField(id, 'category', name.trim().toLowerCase());
+          break;
+        }
+
+        case 'cycle-pri': {
+          const task = tasks.find(t => t.id === id);
+          if (!task) break;
+          const cycle = { low: 'medium', medium: 'high', high: 'low' };
+          updateField(id, 'priority', cycle[task.priority]);
+          break;
+        }
+      }
+    });
+
+    // Inline text editing
+    function startEditText(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      const textEl = taskListEl.querySelector(`.task-text[data-id="${id}"]`);
+      if (!textEl) return;
+
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'edit-input';
+      inp.value = task.text;
+      textEl.replaceWith(inp);
+      inp.focus();
+      inp.select();
+
+      let saved = false;
+      const save = async () => {
+        if (saved) return;
+        saved = true;
+        const val = inp.value.trim();
+        if (val && val !== task.text) {
+          await updateField(id, 'text', val);
+        } else {
+          render();
+        }
+      };
+
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        if (e.key === 'Escape') { saved = true; render(); }
+      });
+      inp.addEventListener('blur', save);
+    }
+
+    // Lightbox
+    function openLightbox(src) {
+      const lb = document.createElement('div');
+      lb.className = 'lightbox';
+      lb.innerHTML = `<img src="${src}">`;
+      lb.addEventListener('click', () => lb.remove());
+      document.addEventListener('keydown', function handler(e) {
+        if (e.key === 'Escape') { lb.remove(); document.removeEventListener('keydown', handler); }
+      });
+      document.body.appendChild(lb);
+    }
+
+    // Global keyboard shortcut: / to focus input
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && !e.target.closest('input, textarea, [contenteditable]')) {
+        e.preventDefault();
+        input.focus();
+      }
+    });
+
+    // --- Init ---
+    loadTasks();
+  </script>
+</body>
+</html>

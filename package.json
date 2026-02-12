@@ -1,0 +1,25 @@
+{
+  "name": "handoff",
+  "version": "1.0.0",
+  "description": "A zero-dependency local task tracker for AI-assisted development. Drop tasks, paste screenshots, let your AI agent handle the rest.",
+  "scripts": {
+    "start": "bun run server.ts",
+    "dev": "bun --watch run server.ts"
+  },
+  "keywords": [
+    "task-tracker",
+    "ai-development",
+    "screenshots",
+    "local-first",
+    "bun",
+    "zero-dependency",
+    "claude-code",
+    "cursor",
+    "vibe-coding"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomie/handoff"
+  }
+}
